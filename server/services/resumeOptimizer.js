@@ -115,10 +115,12 @@ Identify existing work experience bullets that are least useful for this specifi
 
 Rules:
 - Review only work experience bullets.
+- Return bullet text exactly as provided in WORK EXPERIENCE. Do not shorten, rewrite, split, or return partial line fragments.
 - Do not review summary, skills, or key highlights.
 - A low-value bullet is one that does not support required skills, preferred skills, responsibilities, role/domain fit, or credibility for the target role.
 - Do not mark a bullet unwanted if it contains or supports any required skill, preferred skill, matched skill, missing skill, domain keyword, measurable impact, or role-relevant responsibility.
 - Only return bullets that are safe to remove with low risk of reducing ATS score for this JD.
+- If the available bullet text looks incomplete, do not include it.
 - If unsure, do not include the bullet.
 - Be conservative.
 - Return STRICT JSON ONLY.
@@ -156,10 +158,14 @@ ${JSON.stringify(buildOptimizationExperience(resume), null, 2)}
 
   const parsed = await completeJSON(prompt, "You identify low-value resume bullets for a specific JD.");
 
-  return {
-    unwantedBullets: Array.isArray(parsed.unwantedBullets)
+  const unwantedBullets =
+    Array.isArray(parsed.unwantedBullets)
       ? parsed.unwantedBullets.map(normalizeUnwantedBullet).filter(Boolean)
-      : []
+      : [];
+
+  return {
+    unwantedBullets:
+      alignUnwantedBulletsToResume(unwantedBullets, resume)
   };
 }
 
@@ -406,6 +412,75 @@ function normalizeUnwantedBullet(item) {
       cleanString(item.atsImpact) ||
       "unlikely to reduce ATS score"
   };
+}
+
+function alignUnwantedBulletsToResume(unwantedBullets, resume) {
+  const existingBullets = getExistingExperienceBullets(resume);
+  const seen = new Set();
+
+  return unwantedBullets
+    .map(item => {
+      const match = findExistingBulletMatch(item, existingBullets);
+
+      if (!match) {
+        return null;
+      }
+
+      const key = normalizeForKeywordSearch(
+        `${match.company} ${match.heading} ${match.bullet}`
+      );
+
+      if (seen.has(key)) {
+        return null;
+      }
+
+      seen.add(key);
+
+      return {
+        ...item,
+        company: match.company || item.company,
+        heading: match.heading || item.heading,
+        bullet: match.bullet
+      };
+    })
+    .filter(Boolean);
+}
+
+function getExistingExperienceBullets(resume) {
+  if (!Array.isArray(resume.experience)) {
+    return [];
+  }
+
+  return resume.experience.flatMap(exp =>
+    Array.isArray(exp.bullets)
+      ? exp.bullets
+          .map(bullet => cleanString(bullet.text))
+          .filter(text => text.length >= 40)
+          .map(text => ({
+            company: cleanString(exp.company) || "Unassigned",
+            heading: cleanString(exp.heading),
+            bullet: text
+          }))
+      : []
+  );
+}
+
+function findExistingBulletMatch(item, existingBullets) {
+  const candidate = normalizeForKeywordSearch(item.bullet);
+
+  if (!candidate || candidate.length < 20) {
+    return null;
+  }
+
+  return existingBullets.find(existing => {
+    const existingText = normalizeForKeywordSearch(existing.bullet);
+
+    return (
+      existingText === candidate ||
+      existingText.includes(candidate) ||
+      candidate.includes(existingText)
+    );
+  });
 }
 
 function buildOptimizationResume(resume) {

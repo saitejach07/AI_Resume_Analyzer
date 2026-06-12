@@ -1,35 +1,120 @@
-# AI Resume Analyzer Documentation
+# AI Resume Analyzer Project Documentation
 
-## Project Purpose
+Last updated: 2026-06-11
 
-This project is an AI-powered resume-to-job-description analyzer. A user uploads a resume as PDF, DOC, or DOCX, pastes a job description, and receives an ATS-style match report.
+## Contents
 
-The application currently supports:
+1. [Project Summary](#1-project-summary)
+2. [Current Project Status](#2-current-project-status)
+3. [Repository Structure](#3-repository-structure)
+4. [Runtime Requirements](#4-runtime-requirements)
+5. [Environment Variables](#5-environment-variables)
+6. [Running Locally](#6-running-locally)
+7. [High-Level Architecture](#7-high-level-architecture)
+8. [End-To-End Request Flows](#8-end-to-end-request-flows)
+9. [Backend Architecture](#9-backend-architecture)
+10. [Frontend Architecture](#10-frontend-architecture)
+11. [API Contracts](#11-api-contracts)
+12. [Scoring Logic](#12-scoring-logic)
+13. [User Experience Flow](#13-user-experience-flow)
+14. [Major Issues Fixed](#14-major-issues-fixed)
+15. [Security And Cost Posture](#15-security-and-cost-posture)
+16. [Performance Analysis](#16-performance-analysis)
+17. [Current Known Limitations](#17-current-known-limitations)
+18. [Prioritized Recommendations](#18-prioritized-recommendations)
+19. [Verification Commands](#19-verification-commands)
+20. [Handoff Notes](#20-handoff-notes)
 
-- Resume upload and text extraction from PDF and DOCX.
-- Resume structuring into summary, skills, highlights, and work experience.
-- Dynamic job-description parsing across any job domain, not only software roles.
-- ATS skill matching with required/preferred scoring.
-- Missing skill overview.
-- AI-generated resume bullet suggestions for missing skills.
-- AI-assisted unwanted/low-value work experience bullet detection.
-- React + Tailwind frontend with animated UI and advanced overview actions.
+## 1. Project Summary
 
-## Repository Structure
+AI Resume Analyzer is a full-stack local web application that compares a resume against a job description and returns an ATS-style match report.
+
+The user flow is:
+
+1. Upload a resume as PDF or DOCX.
+2. Paste a job description.
+3. Click `Analyze ATS score`.
+4. Review the overall match, required match, preferred match, detected role, and missing skills.
+5. Open the advanced workspace for detailed skill lists.
+6. Generate suggested resume bullets for missing skills.
+7. Identify low-value work experience bullets that are unlikely to hurt the score if removed.
+
+The app uses deterministic parsing and matching where possible, and uses OpenAI for role extraction, semantic matching, and advanced resume optimization suggestions.
+
+## 2. Current Project Status
+
+The project is currently a functional local MVP/alpha.
+
+Completed so far:
+
+- Backend Express API is implemented.
+- Frontend React/Vite app is implemented.
+- PDF parsing has been fixed so PDF resumes populate `resume.summary` and `resume.skills`.
+- DOCX and PDF resumes now run through the same resume structuring pipeline after text extraction.
+- `KEY HIGHLIGHTS` are kept separate from the summary and work experience.
+- Skill extraction has been improved to avoid polluted skills such as `Languages Java` or `Tailwind CSS Backend NodeJS`.
+- JD parsing is domain-neutral and is no longer hardcoded only for software jobs.
+- Matching supports deterministic exact/alias checks before OpenAI semantic matching.
+- Required/preferred skill duplicates are removed, with required skills taking priority.
+- Main endpoint `/api/analyze` is functional.
+- Advanced endpoint `/api/analyze/generate-bullets` is functional.
+- Advanced endpoint `/api/analyze/unwanted-bullets` is functional.
+- Advanced endpoints use the current frontend `analysisContext` to avoid mismatch between visible missing skills and generated results.
+- Frontend has a dark professional workspace theme.
+- Frontend has a focus-results toggle that hides/shows the resume and JD input area after analysis.
+- Frontend has been refactored into reusable components instead of keeping all UI inside `AnalyzerPage.tsx`.
+
+Current quality level:
+
+- Good for local demos, iteration, and portfolio review.
+- Not ready for production deployment yet.
+- Needs automated tests, OCR support, deployment setup, and production security hardening before public release.
+
+## 3. Repository Structure
 
 ```text
 Ai_Resume_Analyzer/
+  README.md
+  .gitignore
+
   client/
+    index.html
+    package.json
+    vite.config.ts
+    eslint.config.js
+    tsconfig.json
     src/
       App.tsx
       main.tsx
       index.css
       pages/
         AnalyzerPage.tsx
-    package.json
-    vite.config.ts
+      components/
+        analyzer/
+          ActionTile.tsx
+          AdvancedInsightsPanel.tsx
+          AnalyzeActionBar.tsx
+          AnalyzerHeader.tsx
+          AnalyzerInputForm.tsx
+          Chip.tsx
+          EmptyInsightState.tsx
+          GeneratedBulletsPanel.tsx
+          InsightTabButton.tsx
+          JobDescriptionCard.tsx
+          MetricCard.tsx
+          ResumeUploadCard.tsx
+          RoleSummaryCard.tsx
+          ScoreRing.tsx
+          ScoreSummaryCard.tsx
+          SkillGroup.tsx
+          StatPill.tsx
+          UnwantedBulletsPanel.tsx
+          WorkspaceToolbar.tsx
+      types/
+        analyzer.ts
 
   server/
+    package.json
     server.js
     routes/
       analyzeRoutes.js
@@ -43,19 +128,55 @@ Ai_Resume_Analyzer/
       resumeOptimizer.js
       resumeParser.js
       resumeStructurer.js
-    package.json
 
   docs/
     PROJECT_DOCUMENTATION.md
 ```
 
-## Runtime Requirements
+## 4. Runtime Requirements
 
-### Backend
+Backend:
 
 - Node.js
-- `OPENAI_API_KEY` in `server/.env`
-- Port: `5011` by default
+- OpenAI API key
+- Default port: `5011`
+
+Frontend:
+
+- Node.js
+- Vite dev server
+- Default port: `5173`
+
+## 5. Environment Variables
+
+Create `server/.env`:
+
+```env
+OPENAI_API_KEY=your_openai_api_key_here
+PORT=5011
+```
+
+Rules:
+
+- Never commit `.env`.
+- Never commit API keys, passwords, or tokens.
+- If a credential was ever shared in chat or committed by mistake, rotate it before public use.
+
+## 6. Running Locally
+
+Install backend dependencies:
+
+```bash
+cd server
+npm install
+```
+
+Install frontend dependencies:
+
+```bash
+cd ../client
+npm install
+```
 
 Start backend:
 
@@ -70,12 +191,6 @@ Backend URL:
 http://localhost:5011
 ```
 
-### Frontend
-
-- Vite
-- React
-- Tailwind CSS v4
-
 Start frontend:
 
 ```bash
@@ -89,65 +204,148 @@ Frontend URL:
 http://127.0.0.1:5173/
 ```
 
-## Environment Variables
-
-Backend expects:
-
-```env
-OPENAI_API_KEY=your_api_key_here
-PORT=5011
-```
-
-`PORT` is optional. If not set, backend uses `5011`.
-
-## High-Level Architecture
+## 7. High-Level Architecture
 
 ```text
-Frontend
+React Frontend
   |
   | multipart/form-data
   v
-POST /api/analyze
-  |
-  v
-analyzeController
+Express API
   |
   |-- resumeParser
-  |     |-- PDF: pdfjs-dist
-  |     |-- DOCX: mammoth
+  |     |-- PDF text extraction with pdfjs-dist
+  |     |-- DOCX text extraction with mammoth
   |
   |-- resumeStructurer
   |     |-- summary
   |     |-- skills
-  |     |-- highlights
-  |     |-- grouped experience
+  |     |-- key highlights
+  |     |-- work experience
   |
   |-- aiJDClassifier
-  |     |-- detectedRole
-  |     |-- jobDomain
-  |     |-- requiredSkills
-  |     |-- preferredSkills
+  |     |-- detected role
+  |     |-- job domain
+  |     |-- required skills
+  |     |-- preferred skills
   |     |-- responsibilities
   |
   |-- aiSkillExtractor
   |     |-- role/domain-aware skill normalization
   |
   |-- matchEngine
-        |-- deterministic exact/alias matching
-        |-- AI semantic matching
-        |-- scoring
+  |     |-- deterministic matching
+  |     |-- alias matching
+  |     |-- OpenAI semantic matching for unresolved skills
+  |     |-- scoring
+  |
+  |-- resumeOptimizer
+        |-- missing-skill bullet generation
+        |-- unwanted bullet detection
 ```
 
-Advanced actions use:
+## 8. End-To-End Request Flows
+
+### 8.1 Primary Analysis Flow
 
 ```text
-POST /api/analyze/generate-bullets
-POST /api/analyze/unwanted-bullets
+User
+  -> uploads resume
+  -> pastes job description
+  -> clicks Analyze ATS score
+
+Frontend AnalyzerPage.handleSubmit
+  -> validates resumeFile and jobDescription
+  -> builds FormData with resume and jobDescription
+  -> POST http://localhost:5011/api/analyze
+
+Backend analyzeRoutes
+  -> Multer validates file field, MIME type, and file size
+  -> analyzeController.analyzeResume
+
+Backend buildAnalysis
+  -> resumeParser.extractResumeText
+  -> resumeStructurer.buildResumeJSON
+  -> aiJDClassifier.classifyJDWithAI
+  -> aiSkillExtractor.extractAtomicSkills for required skills
+  -> aiSkillExtractor.extractAtomicSkills for preferred skills
+  -> computeMatch with deterministic and AI semantic matching
+
+Frontend result render
+  -> stores AnalyzeResponse in result
+  -> collapses inputs into focus-results mode
+  -> opens advanced overview
+  -> shows score, role, skills, missing skills, and advanced actions
 ```
 
-The frontend sends the current analysis context to these advanced endpoints so the generated results use the same missing skills already visible in the UI.
+Cost profile:
 
-## Backend Files
+- Resume parsing and structuring are local.
+- JD classification uses OpenAI.
+- Required skill normalization uses OpenAI.
+- Preferred skill normalization uses OpenAI.
+- Semantic matching for unresolved skills uses OpenAI.
+
+### 8.2 Generate Missing-Skill Bullets Flow
+
+```text
+User
+  -> clicks Generate bullet points for missing skills
+
+Frontend AnalyzerPage.handleAdvancedAction('generate')
+  -> switches active tab to generated
+  -> builds FormData with resume, jobDescription, and analysisContext
+  -> analysisContext contains current visible jobDescription and match result
+  -> POST /api/analyze/generate-bullets
+
+Backend generateBullets
+  -> re-parses resume into structured resume data
+  -> parses analysisContext
+  -> reuses visible missingRequired and missingPreferred
+  -> resumeOptimizer.generateMissingSkillBullets
+  -> validates exact keyword coverage
+  -> repairs or falls back if coverage is incomplete
+
+Frontend
+  -> renders target company/heading
+  -> renders generated bullet text
+  -> renders covered skill chips
+  -> renders coverage count
+```
+
+Important guarantee:
+
+- The generated endpoint should cover the missing skills already shown in the UI, not a freshly recalculated skill set.
+
+### 8.3 Identify Unwanted Bullets Flow
+
+```text
+User
+  -> clicks Identify unwanted bullet points
+
+Frontend AnalyzerPage.handleAdvancedAction('unwanted')
+  -> switches active tab to cleanup
+  -> builds FormData with resume, jobDescription, and analysisContext
+  -> POST /api/analyze/unwanted-bullets
+
+Backend findUnwantedBullets
+  -> re-parses resume into structured resume data
+  -> parses analysisContext
+  -> reviews work experience bullets only
+  -> excludes summary, skills, and key highlights
+  -> aligns AI-identified bullets back to full parsed resume bullets
+
+Frontend
+  -> renders company/heading
+  -> renders full bullet text
+  -> renders risk level and ATS impact
+```
+
+Important guarantee:
+
+- Cleanup suggestions should be conservative and should not be based on broken bullet fragments.
+
+## 9. Backend Architecture
 
 ### `server/server.js`
 
@@ -155,21 +353,22 @@ Express app entrypoint.
 
 Responsibilities:
 
+- Loads environment variables.
 - Enables CORS.
 - Enables JSON parsing.
 - Mounts analyze routes at `/api/analyze`.
-- Starts the backend server.
+- Starts the server.
 
 ### `server/routes/analyzeRoutes.js`
 
-Defines upload handling and API routes.
+Defines upload handling and analyze routes.
 
-Multer config:
+Multer upload rules:
 
-- Memory upload.
-- Max file size: `2MB`.
-- Required file field name: `resume`.
-- Allowed MIME types:
+- Uses memory storage.
+- Maximum file size is `2MB`.
+- File field must be named `resume`.
+- Accepted MIME types:
   - `application/pdf`
   - `application/msword`
   - `application/vnd.openxmlformats-officedocument.wordprocessingml.document`
@@ -184,7 +383,7 @@ POST /api/analyze/unwanted-bullets
 
 ### `server/controllers/analyzeController.js`
 
-Main orchestration layer.
+Orchestration layer for the backend.
 
 Primary functions:
 
@@ -195,38 +394,43 @@ Primary functions:
 
 Important behavior:
 
-- `/api/analyze` performs the full parse/classify/match pipeline.
-- Advanced endpoints can use `analysisContext` sent from the frontend, avoiding a second JD/match recalculation.
-- Required skills take priority over preferred skills.
-- Preferred skills are de-duplicated against required skills.
-- Missing preferred skills are de-duplicated against missing required skills.
+- Validates that resume and JD are present.
+- Extracts resume text.
+- Builds structured resume JSON.
+- Classifies the JD.
+- Normalizes required and preferred skills.
+- Computes match result.
+- Uses `analysisContext` for advanced endpoints when provided.
+- Deduplicates preferred skills against required skills.
+- Deduplicates missing preferred skills against missing required skills.
 
 ### `server/services/resumeParser.js`
 
-Extracts raw text from uploaded files.
+Extracts raw text from uploaded resume files.
 
 PDF behavior:
 
 - Uses `pdfjs-dist`.
-- Reconstructs PDF rows using PDF text item coordinates.
-- Sorts rows top-to-bottom.
-- Sorts row items left-to-right.
-- Joins rows with newlines.
+- Reconstructs rows using text item coordinates.
+- Sorts rows from top to bottom.
+- Sorts row items from left to right.
+- Preserves line breaks so section headers remain detectable.
 
 DOCX behavior:
 
 - Uses `mammoth.extractRawText`.
-- Returns raw text from Word documents.
+- Returns raw document text.
 
 DOC behavior:
 
-- Currently rejected with an error asking the user to upload DOCX instead.
+- Upload MIME type may be accepted by Multer.
+- Parser rejects legacy `.doc` and asks the user to upload DOCX.
 
 ### `server/services/resumeStructurer.js`
 
-Converts raw resume text into structured resume JSON.
+Converts raw resume text into structured resume data.
 
-Current output shape internally:
+Internal shape:
 
 ```json
 {
@@ -257,30 +461,21 @@ Current output shape internally:
 }
 ```
 
-Key features:
+Important behavior:
 
-- Recognizes summary headers.
-- Recognizes skills headers.
-- Recognizes key highlights separately from summary.
-- Recognizes work experience, project, and employment history sections.
-- Keeps `KEY HIGHLIGHTS` separate from `WORK EXPERIENCE`.
-- Extracts clear skill keywords from highlights and merges them into `resume.skills`.
-- Handles PDF bullet-style resumes.
-- Handles DOCX paragraph-style resumes where bullets may not have bullet symbols.
-- Groups experience under client/company headings.
-- Preserves role heading separately from client heading.
-- Preserves tech stack lines under the correct work experience.
-
-Important section handling:
-
-- `SUMMARY` goes to `summary`.
-- `KEY HIGHLIGHTS` goes to `highlights`.
-- `TECHNICAL SKILLS` goes to `skills`.
-- `WORK EXPERIENCE` goes to `experience`.
+- Keeps summary separate from key highlights.
+- Keeps key highlights separate from work experience.
+- Uses key highlights as skill evidence.
+- Detects skills sections and splits categories.
+- Handles skill pollution from category labels.
+- Handles PDF wrapped lines.
+- Handles DOCX paragraph-style bullets.
+- Groups experience by company/client heading.
+- Preserves role and tech stack under the correct work experience.
 
 ### `server/services/aiJDClassifier.js`
 
-Uses OpenAI to parse the job description.
+Uses OpenAI to classify the job description.
 
 Output:
 
@@ -294,66 +489,40 @@ Output:
 }
 ```
 
-Important improvement:
+Important behavior:
 
-- Originally focused on software/IT.
-- Now domain-neutral.
-- Can parse healthcare, accounting, sales, marketing, HR, construction, education, software, and other domains.
+- Domain-neutral.
+- Supports software and non-software job descriptions.
+- Does not force every JD into a software role.
 
 ### `server/services/aiSkillExtractor.js`
 
-Normalizes JD skill phrases into ATS-friendly keywords.
-
-Important behavior:
-
-- Uses detected role and domain as context.
-- Does not force software keywords for non-software roles.
-- Keeps role-specific skills, systems, tools, certifications, methods, and domain terms.
+Normalizes JD skills into ATS-friendly atomic keywords.
 
 Examples:
 
-- Healthcare: `EHR`, `HIPAA`, `BLS`, `Patient Care`
+- Software: `React`, `Java`, `Docker`, `CI/CD`
+- Cloud: `AWS`, `CloudFormation`, `Terraform`
+- Healthcare: `EHR`, `HIPAA`, `Patient Care`
 - Accounting: `GAAP`, `QuickBooks`, `Month-End Close`
 - Sales: `CRM`, `Salesforce`, `Pipeline Management`
-- Software: `React`, `Java`, `Docker`, `CI/CD`
 
 ### `server/services/matchEngine.js`
 
-Computes match score.
+Computes match result.
 
 Flow:
 
-1. Builds a resume corpus from:
-   - summary
-   - skills
-   - highlights
-   - experience bullets
-   - tech stacks
-   - other text
-2. De-duplicates required/preferred skills.
+1. Builds a resume corpus from summary, skills, highlights, experience bullets, tech stacks, and other text.
+2. Deduplicates required and preferred skills.
 3. Removes required duplicates from preferred.
-4. Runs deterministic exact/alias matching first.
+4. Runs deterministic exact and alias matching.
 5. Sends only unresolved skills to OpenAI semantic matching.
-6. Computes scores.
-
-Deterministic matching prevents obvious false negatives. If a skill is visibly present in the resume, it is matched without relying on OpenAI.
-
-Examples of deterministic aliases:
-
-- `GitHub Actions`
-- `CloudFormation`
-- `Integrations`
-- `Asynchronous systems`
-- `RESTful APIs`
-- `CI/CD`
-- `Infrastructure-as-Code`
-- `Node.js`
-- `React`
-- `Genesys Cloud CX Administration`
+6. Computes required, preferred, and overall scores.
 
 ### `server/services/resumeOptimizer.js`
 
-Supports advanced actions.
+Handles advanced optimization actions.
 
 Functions:
 
@@ -362,23 +531,153 @@ Functions:
 
 Bullet generation behavior:
 
-- Uses current missing required/preferred skills from the UI analysis context.
-- Generates suggestions under existing work experience sections.
-- Does not place generated bullets under `KEY HIGHLIGHTS`.
-- Requires exact missing keywords inside generated bullet text.
-- Repairs missing keyword coverage if the first AI response misses a term.
-- Falls back to generated coverage bullets if OpenAI still misses a keyword.
+- Uses the missing required/preferred skills visible in the UI.
+- Suggests bullets under existing work experience sections.
+- Does not place suggestions under key highlights.
+- Requires exact missing keywords to appear in bullet text.
+- Repairs missing keyword coverage if OpenAI misses a term.
 - De-duplicates repeated skills.
-- Sorts output by target experience section.
+- Sorts suggestions by target experience section.
 
 Unwanted bullet behavior:
 
 - Reviews work experience bullets only.
 - Does not review summary, skills, or key highlights.
+- Uses the full parsed bullet text, not broken fragments.
 - Conservative by design.
-- Only returns bullets that are low risk to remove for the current JD.
+- Returns low-risk bullets for the current JD.
 
-## API Contracts
+## 10. Frontend Architecture
+
+### `client/src/App.tsx`
+
+Thin app shell:
+
+```tsx
+import AnalyzerPage from './pages/AnalyzerPage'
+
+export default function App() {
+  return <AnalyzerPage />
+}
+```
+
+### `client/src/pages/AnalyzerPage.tsx`
+
+State and workflow owner.
+
+Responsibilities:
+
+- Resume file state.
+- JD textarea state.
+- Analyze API call.
+- Advanced action API calls.
+- Error state.
+- Loading state.
+- Advanced overview state.
+- Focus-results toggle state.
+- Active advanced tab state.
+
+It now calls focused components instead of rendering the entire UI inline.
+
+### State Management
+
+All user-facing workflow state currently lives in `AnalyzerPage.tsx`.
+
+| State | Type | Purpose |
+| --- | --- | --- |
+| `resumeFile` | `File \| null` | Uploaded resume file object |
+| `jobDescription` | `string` | JD textarea content |
+| `result` | `AnalyzeResponse \| null` | Full response from `/api/analyze` |
+| `isLoading` | `boolean` | Primary analysis loading state |
+| `advancedAction` | `AdvancedAction \| null` | Which advanced action is running |
+| `error` | `string` | Primary analysis error message |
+| `advancedError` | `string` | Advanced action error message |
+| `showAdvanced` | `boolean` | Whether advanced overview is visible |
+| `isInputPanelCollapsed` | `boolean` | Whether the input workspace is hidden |
+| `activeInsightTab` | `InsightTab` | Current tab: skills, generated, or cleanup |
+| `generatedBullets` | `GenerateBulletsResponse \| null` | Generated bullets result |
+| `unwantedBullets` | `UnwantedBulletsResponse \| null` | Cleanup result |
+
+Important derived values:
+
+| Value | Purpose |
+| --- | --- |
+| `canAnalyze` | Enables analyze button only when file and JD exist |
+| `canRunAdvancedAction` | Enables advanced actions after a valid analysis |
+| `missingTotal` | Total missing required + preferred skills |
+| `jobDescriptionWordCount` | JD word count badge |
+| `isFocusMode` | Result-focused layout mode |
+| `scoreTone` | Score ring color family based on match percentage |
+
+### `client/src/types/analyzer.ts`
+
+Shared frontend response types:
+
+- `AnalyzeResponse`
+- `GeneratedBullet`
+- `GenerateBulletsResponse`
+- `UnwantedBullet`
+- `UnwantedBulletsResponse`
+- `AdvancedAction`
+- `InsightTab`
+
+### Component Inventory
+
+| Component | Responsibility |
+| --- | --- |
+| `AnalyzerHeader` | Header card, title, tagline, stat pills |
+| `StatPill` | Small header stat display |
+| `WorkspaceToolbar` | Focus-results toggle bar |
+| `AnalyzerInputForm` | Form wrapper for resume, JD, error, and submit |
+| `ResumeUploadCard` | File input and selected filename display |
+| `JobDescriptionCard` | JD textarea with word count |
+| `AnalyzeActionBar` | Analyze button and backend-flow note |
+| `ScoreSummaryCard` | Overall score, required score, preferred score |
+| `ScoreRing` | Circular conic-gradient score indicator |
+| `MetricCard` | Required/preferred metric card |
+| `RoleSummaryCard` | Detected role, domain, and advanced toggle |
+| `AdvancedInsightsPanel` | Skills/generated/cleanup tab workspace |
+| `InsightTabButton` | Individual tab button with count |
+| `SkillGroup` | Skill chip group with count |
+| `Chip` | Reusable skill/result tag |
+| `ActionTile` | Advanced action card/button |
+| `GeneratedBulletsPanel` | Generated bullet cards |
+| `UnwantedBulletsPanel` | Cleanup bullet cards |
+| `EmptyInsightState` | Empty state text for advanced tabs |
+
+### `client/src/index.css`
+
+Global style system.
+
+Current UI direction:
+
+- Dark professional workspace.
+- Near-black navy/slate background.
+- Dark charcoal panels.
+- Soft borders.
+- Subtle 3D depth.
+- Emerald accents for primary/focus/generated items.
+- Rose accents for missing skills.
+- Amber accents for unwanted bullet cleanup.
+
+Important custom classes:
+
+- `.glass-panel`
+- `.depth-panel`
+- `.focus-toolbar`
+- `.focus-toggle`
+- `.button-primary`
+- `.button-secondary`
+- `.score-shell`
+- `.score-dial`
+- `.insight-workbench`
+- `.insight-tabbar`
+- `.insight-tab`
+- `.insight-section`
+- `.action-tile`
+- `.app-aurora`
+
+## 11. API Contracts
 
 ### Analyze Resume
 
@@ -434,7 +733,7 @@ Form fields:
 ```text
 resume: PDF/DOC/DOCX file
 jobDescription: string
-analysisContext: JSON string from the current /api/analyze response
+analysisContext: JSON string from current /api/analyze result
 ```
 
 Response:
@@ -475,7 +774,7 @@ Form fields:
 ```text
 resume: PDF/DOC/DOCX file
 jobDescription: string
-analysisContext: JSON string from the current /api/analyze response
+analysisContext: JSON string from current /api/analyze result
 ```
 
 Response:
@@ -498,9 +797,9 @@ Response:
 }
 ```
 
-## Scoring Logic
+## 12. Scoring Logic
 
-Current scoring is in `server/services/matchEngine.js`.
+Current scoring is intentionally simple and explainable.
 
 ```text
 requiredMatch = matchedRequired / totalRequired * 100
@@ -510,109 +809,59 @@ overallMatch = requiredMatch * 0.7 + preferredMatch * 0.3
 
 Weighting:
 
-```text
-Required skills: 70%
-Preferred skills: 30%
-```
+- Required skills: 70%
+- Preferred skills: 30%
 
-Example:
+Rules:
 
-```text
-Required match = 100%
-Preferred match = 94%
+- Required skills take priority over preferred skills.
+- Preferred duplicates are removed if already present in required.
+- Missing preferred duplicates are removed if already present in missing required.
+- Deterministic matches are accepted before AI semantic matching.
 
-Overall = (100 * 0.7) + (94 * 0.3)
-Overall = 98.2
-Rounded = 98%
-```
-
-This is intentionally simple and explainable. A future scoring model could add:
+Future scoring could add:
 
 - skill importance
 - years of experience
 - domain relevance
-- recency
-- certifications
 - seniority fit
+- certifications
+- recency
 
-## Frontend Architecture
+## 13. User Experience Flow
 
-### `client/src/App.tsx`
+Initial screen:
 
-Thin shell:
+- Header introduces the tool.
+- Resume upload card accepts PDF/DOC/DOCX.
+- JD card accepts pasted job description.
+- Score area shows an empty waiting state.
 
-```tsx
-import AnalyzerPage from './pages/AnalyzerPage'
+After analysis:
 
-export default function App() {
-  return <AnalyzerPage />
-}
-```
+- Overall score appears.
+- Required and preferred scores appear.
+- Detected role appears.
+- Advanced overview is available.
+- Inputs collapse automatically into focus-results mode.
 
-### `client/src/pages/AnalyzerPage.tsx`
+Focus-results mode:
 
-Main frontend page.
+- Resume and JD input area is hidden.
+- Result space expands.
+- User can toggle inputs back on using the workspace button.
 
-Responsibilities:
+Advanced overview:
 
-- Resume upload.
-- JD textarea.
-- Analyze button.
-- Overall score panel.
-- Required/preferred score cards.
-- Detected role card.
-- Advanced overview toggle.
-- Required/preferred/missing skill chips.
-- Generate bullet points button.
-- Identify unwanted bullet points button.
-- Generated bullets panel.
-- Unwanted bullets panel.
+- Skills tab shows required, preferred, missing required, and missing preferred.
+- Generated tab shows missing-skill bullet suggestions.
+- Cleanup tab shows unwanted/low-value bullet suggestions.
 
-Important behavior:
+## 14. Major Issues Fixed
 
-- Advanced actions send `analysisContext` from the current analysis result.
-- This prevents generated bullet coverage from using a different OpenAI analysis than the visible missing skill chips.
+### PDF Summary and Skills Empty
 
-### `client/src/index.css`
-
-Contains:
-
-- Tailwind import.
-- Base styles.
-- Glass panel component class.
-- Primary and secondary button classes.
-- Result card class.
-- Animated aurora background.
-- Card entrance animation.
-- Shimmer animation.
-- Loading dot animation.
-
-## Frontend User Flow
-
-1. User uploads PDF or DOCX resume.
-2. User pastes JD.
-3. User clicks `Analyze ATS score`.
-4. UI shows:
-   - overall match
-   - required match
-   - preferred match
-   - detected role
-   - job domain
-5. User clicks `Advanced overview`.
-6. UI shows:
-   - required skills
-   - preferred skills
-   - missing required
-   - missing preferred
-7. User can click:
-   - `Generate bullet points for missing skills`
-   - `Identify unwanted bullet points`
-
-## Major Issues Fixed During Development
-
-### 1. PDF Summary and Skills Empty
-
-Original issue:
+Original observed PDF output:
 
 ```json
 {
@@ -625,17 +874,17 @@ Original issue:
 
 Root cause:
 
-- PDF parser joined all text items with spaces.
-- Section headers were lost as standalone lines.
+- PDF extraction flattened text into a space-heavy stream.
+- Section headers were not reliably preserved as lines.
 
 Fix:
 
-- Rebuilt PDF page text by visual rows using item coordinates.
-- Preserved newlines.
+- Rebuilt PDF text by visual rows using PDF text coordinates.
+- Preserved newlines before sending raw text to `resumeStructurer`.
 
-### 2. Polluted Skills
+### Polluted Skills
 
-Bad output:
+Bad output examples:
 
 ```json
 [
@@ -648,12 +897,12 @@ Bad output:
 
 Fix:
 
-- Added skill category detection.
 - Added category boundary splitting.
-- Added parenthetical skill handling.
+- Added section-aware skills parsing.
+- Added parenthetical skill cleanup.
 - Added alias normalization.
 
-Improved output includes:
+Expected style:
 
 ```json
 [
@@ -667,132 +916,180 @@ Improved output includes:
 ]
 ```
 
-### 3. Tech-Only JD Bias
+### Key Highlights Included In Summary
 
-Original issue:
+Problem:
 
-- Prompts assumed software/IT jobs.
-
-Fix:
-
-- Made JD classifier and skill extractor domain-neutral.
-- Added role/domain detection.
-- Preserved non-tech skills for non-tech roles.
-
-### 4. Key Highlights Polluting Summary
-
-Original issue:
-
-- `KEY HIGHLIGHTS` content appeared inside `resume.summary`.
+- `KEY HIGHLIGHTS` was appended to `resume.summary`.
 
 Fix:
 
-- Added separate `highlights` section.
-- Kept highlights out of work experience.
-- Used highlights as extra skill evidence.
+- `KEY HIGHLIGHTS` now becomes a separate `highlights` section.
+- Highlights are used as skill evidence.
+- Highlights are not mixed into work experience.
 
-### 5. Work Experience Mixed With Highlights
+### Work Experience Mixed With Highlights
 
 Decision:
 
-- Do not mix `KEY HIGHLIGHTS` with `WORK EXPERIENCE`.
-- Highlights are global evidence.
-- Work experience remains company/client-specific.
+- Work experience should remain company/client-specific.
+- Key highlights are global evidence.
+- Generated bullets should be placed only under existing work experience sections.
 
-### 6. PDF/DOCX Experience Mismatch
+### Generated Bullets Did Not Include Exact Keywords
 
-Original issue:
+Problem:
 
-- PDF and DOCX structured experience differently.
-- PDF wrapped lines became fake companies.
-- DOCX paragraph-style bullets became one unassigned block.
+- AI sometimes claimed a bullet covered a skill without using that exact searchable keyword.
 
 Fix:
 
-- Recognized role headings.
-- Recognized client headings.
-- Grouped bullets under client/company.
-- Joined wrapped bullet continuation lines.
-- Treated DOCX paragraphs as experience bullets even without bullet symbols.
+- Prompt and post-processing now require the exact missing keyword inside the bullet.
+- A repair pass attempts to fix missing coverage.
+- Fallback bullets are generated if OpenAI still misses a keyword.
 
-### 7. Generated Bullets Covered Wrong Skills
+### Advanced Endpoints Had Different Missing Skill Counts
 
-Original issue:
+Problem:
 
-- AI suggested a bullet claiming to cover a skill but did not include the exact keyword.
-- Example: claimed `Genesys Cloud CX Administration` but bullet only said `integrations`.
+- UI showed one missing-skill set.
+- Advanced endpoint recalculated and returned a different count.
 
 Fix:
 
-- Required every covered skill to appear exactly in the generated bullet.
-- Added post-processing validation.
-- Added repair pass.
-- Added fallback exact keyword coverage.
+- Frontend sends `analysisContext`.
+- Backend advanced endpoints use the current visible analysis context.
 
-### 8. Advanced Actions Had Different Missing Skill Counts
+### Duplicate Required and Preferred Skills
 
-Original issue:
+Problem:
 
-- UI showed one missing skill set.
-- Advanced endpoint recalculated JD/match and got a different missing skill set.
-
-Fix:
-
-- Frontend now sends current analysis context.
-- Backend advanced endpoints use that context instead of recalculating JD/match.
-
-### 9. Duplicate Required and Preferred Skills
-
-Original issue:
-
-- Same skill appeared in both required and preferred.
-- Example:
-  - `Genesys Cloud CX Administration`
-  - `Genesys Cloud CX administration`
+- Skills appeared in both required and preferred with casing differences.
 
 Fix:
 
 - Required skills take priority.
-- Preferred list removes skills already present in required.
-- Matching also de-duplicates missing preferred against missing required.
+- Preferred duplicates are removed.
+- Missing preferred duplicates are removed against missing required.
 
-### 10. Exact Skills Marked Missing Despite Being Present
+### Present Skills Marked Missing
 
-Original issue:
+Problem:
 
-- Skills like `GitHub Actions`, `CloudFormation`, `Integrations`, and `Asynchronous systems` were visible in DOCX but still marked missing.
+- Skills visible in the resume were sometimes marked missing.
 
 Fix:
 
-- Added deterministic exact/alias matching before AI matching.
-- AI now only receives unresolved skills.
+- Added deterministic exact and alias matching before semantic matching.
 
-## Current Known Limitations
+### Unwanted Bullets Were Broken Fragments
 
-- Scanned image-only PDFs are not supported. OCR would be required.
-- DOC files are rejected; user should upload DOCX.
-- Scoring treats all required skills equally and all preferred skills equally.
-- Generated bullets are AI suggestions and still need user review for truthfulness.
-- Unwanted bullet detection is intentionally conservative and may return no bullets.
-- The frontend currently has no persistent storage or user accounts.
-- The backend does not store uploaded resumes.
+Problem:
 
-## Recommended Next Steps
+- Unwanted bullet detection sometimes reviewed partial fragments instead of full bullets.
 
-1. Add a parse-only backend endpoint for debugging uploads without spending OpenAI tokens.
-2. Add formal tests for:
-   - PDF parsing
-   - DOCX parsing
-   - section splitting
-   - skill extraction
-   - scoring
-3. Add OCR support for scanned PDFs.
-4. Add an improved scoring model with skill importance.
-5. Add frontend copy/export buttons for generated bullets.
-6. Add a side-by-side resume improvement workspace.
-7. Add persistence if users need history.
+Fix:
 
-## Verification Commands
+- Resume structuring now joins wrapped bullet continuations.
+- Optimizer maps AI-identified bullets back to full existing work experience bullets where possible.
+
+## 15. Security And Cost Posture
+
+Current local MVP posture:
+
+| Area | Current State | Risk |
+| --- | --- | --- |
+| Authentication | None | High if exposed publicly |
+| Authorization | None | High if exposed publicly |
+| CORS | `cors()` allows broad local access | Medium |
+| Rate limiting | None | High for OpenAI cost abuse |
+| Request size control | File size is limited, JD text length is not | Medium |
+| File storage | Files stay in memory and are not persisted | Low |
+| API key storage | `.env` expected and ignored by git | Low if key is not committed |
+| HTTPS | Not configured for local dev | Medium for production |
+| Logging | Some AI responses are logged for debugging | Medium if logs include sensitive text |
+
+Before public deployment:
+
+1. Restrict CORS to the deployed frontend origin.
+2. Add rate limiting to `/api/analyze`, `/generate-bullets`, and `/unwanted-bullets`.
+3. Add maximum JD text length.
+4. Add authentication or at least a private API key header.
+5. Remove raw OpenAI debug logs from production.
+6. Avoid logging raw resume or JD content.
+7. Add dependency audit checks.
+
+## 16. Performance Analysis
+
+Current bottlenecks:
+
+| Bottleneck | Detail | Severity |
+| --- | --- | --- |
+| Sequential OpenAI calls | JD classify, required extraction, preferred extraction, and semantic match run in sequence | Medium |
+| Advanced endpoint re-parsing | Resume is parsed again for generate/cleanup actions | Medium |
+| No caching | Same resume/JD combination recomputes from scratch | Low for local MVP |
+| Hardcoded API URL | Frontend points directly at `http://localhost:5011` | Medium for deployment |
+
+Practical optimizations:
+
+1. Run required and preferred skill extraction in parallel with `Promise.all`.
+2. Cache parsed resume structure by file hash for short-lived sessions.
+3. Add a parse-only endpoint for parser debugging without OpenAI token spend.
+4. Add request progress indicators for long-running AI calls.
+5. Consider lazy-loading advanced result panels if bundle size becomes an issue.
+
+## 17. Current Known Limitations
+
+- Scanned/image-only PDFs are not supported.
+- OCR is not implemented.
+- Legacy `.doc` files are rejected by the parser; upload DOCX instead.
+- Multi-column PDFs may still produce imperfect reading order.
+- Uploaded files are not stored, which is good for privacy but means no history.
+- No user authentication.
+- No database.
+- No deployment pipeline.
+- No formal backend unit tests yet.
+- No formal frontend component tests yet.
+- Match scoring treats all required skills equally and all preferred skills equally.
+- Generated bullet suggestions need human review before use.
+- AI outputs can vary slightly between runs.
+
+## 18. Prioritized Recommendations
+
+### Priority 1: Reliability, Security, And Cost Control
+
+1. Add automated tests for `resumeParser`, `resumeStructurer`, `matchEngine`, and `resumeOptimizer`.
+2. Add rate limiting and request size limits.
+3. Add a parse-only/debug endpoint that does not call OpenAI.
+4. Restrict CORS before deployment.
+5. Remove raw AI response logging from production.
+6. Make frontend API URL configurable through environment variables.
+
+### Priority 2: Code Quality
+
+1. Extract repeated skill helper utilities into a shared backend helper module.
+2. Extract constants for MIME types, section headers, scoring weights, and skill aliases.
+3. Add a backend config module for port, model name, CORS origin, and limits.
+4. Add a React error boundary around the analyzer page.
+5. Add integration tests for the main API endpoints.
+
+### Priority 3: User Workflow
+
+1. Add copy buttons for generated bullets.
+2. Add export controls for generated suggestions.
+3. Add a reset button.
+4. Group generated bullets more clearly by company/client.
+5. Add score explanation text for why skills are missing.
+
+### Priority 4: Production Features
+
+1. Add OCR support for scanned PDFs.
+2. Add deployment configuration.
+3. Add auth and saved history only if users need persistent accounts.
+4. Add monitoring and privacy-safe logging.
+5. Add an optimized resume draft/export workflow.
+
+## 19. Verification Commands
 
 Frontend:
 
@@ -809,7 +1106,11 @@ node --check server/services/resumeParser.js
 node --check server/services/resumeStructurer.js
 node --check server/services/matchEngine.js
 node --check server/services/resumeOptimizer.js
+node --check server/services/aiJDClassifier.js
+node --check server/services/aiSkillExtractor.js
 node --check server/controllers/analyzeController.js
+node --check server/routes/analyzeRoutes.js
+node --check server/server.js
 ```
 
 Backend module load check without real API calls:
@@ -818,12 +1119,22 @@ Backend module load check without real API calls:
 OPENAI_API_KEY=test node -e 'require("./server/routes/analyzeRoutes"); console.log("server modules loaded")'
 ```
 
-## Important Development Notes
+## 20. Handoff Notes
 
-- `/api/analyze` spends OpenAI tokens.
-- `/api/analyze/generate-bullets` spends OpenAI tokens.
-- `/api/analyze/unwanted-bullets` spends OpenAI tokens.
-- Local parser checks can be done without OpenAI if calling parser/structurer directly.
-- Do not expose `resume.experience` in the main `/api/analyze` response unless the frontend needs it.
-- Keep generated bullets tied to existing work experience sections, not highlights.
-- Keep highlights separate from work experience.
+If sharing the project with someone else, describe it as:
+
+```text
+A local full-stack AI resume analyzer MVP. It supports PDF/DOCX resume upload, JD analysis, ATS-style scoring, missing skill detection, generated resume bullet suggestions, and unwanted bullet cleanup guidance. The backend is functional with Express and OpenAI. The frontend is a dark React/Tailwind workspace and has been refactored into reusable components. It is ready for local demo and further development, but not production deployed yet.
+```
+
+Important handoff details:
+
+- The main app is in `client/src/pages/AnalyzerPage.tsx`.
+- Most UI sections are in `client/src/components/analyzer`.
+- Shared frontend response types are in `client/src/types/analyzer.ts`.
+- Backend routing starts at `server/routes/analyzeRoutes.js`.
+- Backend orchestration is in `server/controllers/analyzeController.js`.
+- Resume parsing and structuring are the most important backend areas.
+- Advanced optimization logic is in `server/services/resumeOptimizer.js`.
+- `.env` must be created locally with `OPENAI_API_KEY`.
+- OpenAI-backed endpoints spend API tokens.

@@ -52,25 +52,18 @@ function splitSections(text) {
 }
 
 function normalizeResumeText(text = "") {
-  return String(text)
+  const normalized = String(text)
     .replace(/\r/g, "\n")
     .replace(/[ \t]+/g, " ")
     .replace(/([a-z])\s+-\s+([a-z])/g, "$1-$2")
     .replace(/[●▪■]/g, "•")
-    .replace(
-      /\b(professional summary|career summary|summary|profile|key highlights|career highlights|professional highlights|highlights|key achievements|achievements|accomplishments|technical skills|core competencies|skills|work experience|professional experience|experience|employment history|projects?|education|certifications?|licenses?|awards?)\b\s*:?\s*/gi,
-      header => {
-        const label = header.trim().replace(/:$/, "");
-
-        if (label === label.toLowerCase()) {
-          return header;
-        }
-
-        return `\n${label}\n`;
-      }
-    )
+    .split("\n")
+    .flatMap(splitInlineSectionHeader)
+    .join("\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+
+  return normalized;
 }
 
 function isSectionHeader(line) {
@@ -137,6 +130,30 @@ function getSectionName(line) {
   if (otherHeaders.has(header)) return "other";
 
   return null;
+}
+
+function splitInlineSectionHeader(line) {
+  const trimmed = line.trim();
+
+  if (!trimmed || isBullet(trimmed)) {
+    return [trimmed];
+  }
+
+  if (getSectionName(trimmed)) {
+    return [trimmed];
+  }
+
+  const headerPattern =
+    /^(professional summary|career summary|summary|profile|key highlights|career highlights|professional highlights|highlights|key achievements|achievements|accomplishments|technical skills|core competencies|skills|work experience|professional experience|employment history|projects?|education|certifications?|licenses?|awards?)\s*:?\s+(.+)$/i;
+
+  const match = trimmed.match(headerPattern);
+
+  if (!match) {
+    return [trimmed];
+  }
+
+  const [, header, rest] = match;
+  return [header.trim(), rest.trim()].filter(Boolean);
 }
 
 /* ----------------------------------------
@@ -332,7 +349,7 @@ function extractExperience(lines = []) {
         currentBlock?.bullets[currentBlock.bullets.length - 1];
 
       if (lastBullet) {
-        if (looksLikeExperienceBullet(line)) {
+        if (shouldStartNewUnmarkedBullet(line, lastBullet.text)) {
           currentBlock.bullets.push({
             id: uuidv4(),
             text: line
@@ -415,9 +432,53 @@ function looksLikeExperienceBullet(line) {
   return (
     line.length > 35 &&
     (
-      /^[A-Z][A-Za-z0-9/&+\s-]{3,90}:\s+/.test(line) ||
+      hasExperienceTitlePrefix(line) ||
       /\b(implemented|developed|designed|built|modernized|integrated|deployed|improved|created|worked|contributed|automated|optimized|delivered|utilized|exposed|enabled)\b/i.test(line)
     )
+  );
+}
+
+function shouldStartNewUnmarkedBullet(line, previousBullet) {
+  if (!isCompleteExperienceBullet(previousBullet)) {
+    return false;
+  }
+
+  if (hasExperienceTitlePrefix(line)) {
+    return true;
+  }
+
+  return (
+    looksLikeExperienceBullet(line) &&
+    !looksLikeContinuationLine(line)
+  );
+}
+
+function hasExperienceTitlePrefix(line = "") {
+  return /^[A-Z][A-Za-z0-9/&+\s-]{3,90}:\s+/.test(line.trim());
+}
+
+function isCompleteExperienceBullet(text = "") {
+  const value = text.trim();
+
+  return (
+    /[.!?]$/.test(value) &&
+    !endsWithContinuationCue(value)
+  );
+}
+
+function endsWithContinuationCue(text = "") {
+  return (
+    /[,;:]$/.test(text.trim()) ||
+    /\b(by|through|using|with|including|into|on|for|and|or|to|from|while|across|support|provider|services)$/i.test(text.trim())
+  );
+}
+
+function looksLikeContinuationLine(line = "") {
+  const value = line.trim();
+
+  return (
+    /^[a-z&(/]/.test(value) ||
+    /^(and|or|with|using|through|while|including|supported|building|dashboards|workflows|autoscaling|optimizing|implementing)\b/i.test(value)
   );
 }
 

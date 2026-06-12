@@ -47,6 +47,7 @@ Thumbs.db
 # Codex/local workspace metadata
 .codex/
 .agents/
+.kombai/
 
 # Secrets and credentials
 *.pem

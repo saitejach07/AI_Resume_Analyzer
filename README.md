@@ -1,83 +1,83 @@
 # AI Resume Analyzer
 
-AI Resume Analyzer is a full-stack resume-to-job-description matching app. Users upload a PDF or DOCX resume, paste a job description, and receive an ATS-style match report with advanced resume optimization actions.
+AI Resume Analyzer is a full-stack resume-to-job-description matching app. Users upload a PDF or DOCX resume, paste a job description, and get an ATS-style score with missing skills, role detection, AI-generated resume bullet suggestions, and low-value bullet cleanup guidance.
 
-## Features
+## Contents
 
-- Upload PDF, DOC, or DOCX resumes.
-- Parse resume summary, skills, key highlights, and work experience.
-- Compare resumes against any job description, not only software roles.
-- Detect job role and professional domain dynamically.
-- Separate required and preferred JD skills.
-- Calculate required, preferred, and overall ATS match percentages.
-- Show missing required and preferred skills.
-- Generate targeted bullet points for missing skills.
-- Identify low-value work experience bullets for a specific JD.
-- Animated React + Tailwind UI with advanced overview controls.
+- [Current Status](#current-status)
+- [Tech Stack](#tech-stack)
+- [Quick Start](#quick-start)
+- [Project Structure](#project-structure)
+- [How The App Works](#how-the-app-works)
+- [API Endpoints](#api-endpoints)
+- [Frontend Architecture](#frontend-architecture)
+- [Match Scoring](#match-scoring)
+- [Security And Cost Notes](#security-and-cost-notes)
+- [Performance Notes](#performance-notes)
+- [Roadmap](#roadmap)
+- [Verification](#verification)
+- [Full Documentation](#full-documentation)
+
+## Current Status
+
+The project is currently a functional local MVP/alpha.
+
+What works now:
+
+- PDF and DOCX resume text extraction.
+- Resume structuring into summary, skills, key highlights, and work experience.
+- Job-description analysis through OpenAI.
+- Domain-neutral role and skill extraction for software and non-software jobs.
+- ATS-style required, preferred, and overall match scoring.
+- Missing required and preferred skill detection.
+- Advanced overview UI.
+- AI-generated bullet points for missing skills.
+- AI-assisted unwanted bullet detection for JD-specific cleanup.
+- Dark professional React/Tailwind frontend with componentized UI sections.
+- Focus-results toggle that hides/shows resume and JD inputs after analysis.
+
+Not production-ready yet:
+
+- No authentication or saved user history.
+- No OCR for scanned/image-only PDFs.
+- No formal automated test suite yet.
+- No deployment configuration yet.
+- No rate limiting or API cost protection yet.
+- AI-generated bullet suggestions must still be reviewed by the user for truthfulness.
 
 ## Tech Stack
 
-### Frontend
+Frontend:
 
 - React 19
 - TypeScript
 - Vite
 - Tailwind CSS v4
 
-### Backend
+Backend:
 
 - Node.js
 - Express
 - Multer
 - OpenAI API
-- `pdfjs-dist` for PDF text extraction
-- `mammoth` for DOCX text extraction
+- `pdfjs-dist` for PDF extraction
+- `mammoth` for DOCX extraction
 
-## Project Structure
+## Quick Start
 
-```text
-client/
-  src/
-    App.tsx
-    main.tsx
-    index.css
-    pages/
-      AnalyzerPage.tsx
-
-server/
-  server.js
-  routes/
-    analyzeRoutes.js
-  controllers/
-    analyzeController.js
-  services/
-    aiJDClassifier.js
-    aiSkillExtractor.js
-    matchEngine.js
-    openaiClient.js
-    resumeOptimizer.js
-    resumeParser.js
-    resumeStructurer.js
-
-docs/
-  PROJECT_DOCUMENTATION.md
-```
-
-## Setup
-
-Install dependencies separately for the backend and frontend.
+Install backend dependencies:
 
 ```bash
 cd server
 npm install
 ```
 
+Install frontend dependencies:
+
 ```bash
 cd ../client
 npm install
 ```
-
-## Environment Variables
 
 Create `server/.env`:
 
@@ -86,21 +86,11 @@ OPENAI_API_KEY=your_openai_api_key
 PORT=5011
 ```
 
-Do not commit `.env` files. They are ignored by `.gitignore`.
-
-## Running Locally
-
 Start the backend:
 
 ```bash
 cd server
 npm run dev
-```
-
-Backend runs at:
-
-```text
-http://localhost:5011
 ```
 
 Start the frontend:
@@ -110,10 +100,104 @@ cd client
 npm run dev
 ```
 
-Frontend runs at:
+Local URLs:
 
 ```text
-http://127.0.0.1:5173/
+Backend:  http://localhost:5011
+Frontend: http://127.0.0.1:5173/
+```
+
+## Project Structure
+
+```text
+Ai_Resume_Analyzer/
+  client/
+    src/
+      App.tsx
+      main.tsx
+      index.css
+      pages/
+        AnalyzerPage.tsx
+      components/
+        analyzer/
+          ActionTile.tsx
+          AdvancedInsightsPanel.tsx
+          AnalyzeActionBar.tsx
+          AnalyzerHeader.tsx
+          AnalyzerInputForm.tsx
+          Chip.tsx
+          EmptyInsightState.tsx
+          GeneratedBulletsPanel.tsx
+          InsightTabButton.tsx
+          JobDescriptionCard.tsx
+          MetricCard.tsx
+          ResumeUploadCard.tsx
+          RoleSummaryCard.tsx
+          ScoreRing.tsx
+          ScoreSummaryCard.tsx
+          SkillGroup.tsx
+          StatPill.tsx
+          UnwantedBulletsPanel.tsx
+          WorkspaceToolbar.tsx
+      types/
+        analyzer.ts
+
+  server/
+    server.js
+    routes/
+      analyzeRoutes.js
+    controllers/
+      analyzeController.js
+    services/
+      aiJDClassifier.js
+      aiSkillExtractor.js
+      matchEngine.js
+      openaiClient.js
+      resumeOptimizer.js
+      resumeParser.js
+      resumeStructurer.js
+
+  docs/
+    PROJECT_DOCUMENTATION.md
+```
+
+## How The App Works
+
+Primary analysis flow:
+
+```text
+User uploads resume + pastes JD
+  -> frontend builds multipart FormData
+  -> POST /api/analyze
+  -> resumeParser extracts PDF/DOCX text
+  -> resumeStructurer builds structured resume data
+  -> aiJDClassifier detects role, domain, required skills, preferred skills
+  -> aiSkillExtractor normalizes skill phrases
+  -> matchEngine performs deterministic + AI semantic matching
+  -> frontend renders score, role, skills, and missing skills
+```
+
+Generated bullet flow:
+
+```text
+User clicks generate bullets
+  -> frontend sends resume, JD, and current analysisContext
+  -> POST /api/analyze/generate-bullets
+  -> backend reuses visible missing skills from analysisContext
+  -> resumeOptimizer generates bullets under existing work experience sections
+  -> backend validates exact keyword coverage
+  -> frontend renders generated bullets and covered skill chips
+```
+
+Unwanted bullet flow:
+
+```text
+User clicks identify unwanted bullets
+  -> frontend sends resume, JD, and current analysisContext
+  -> POST /api/analyze/unwanted-bullets
+  -> backend reviews work experience bullets only
+  -> backend aligns AI results back to full parsed resume bullets
+  -> frontend renders low-risk cleanup suggestions
 ```
 
 ## API Endpoints
@@ -139,9 +223,9 @@ Returns:
 - job domain
 - required skills
 - preferred skills
-- required match
-- preferred match
-- overall match
+- required match percentage
+- preferred match percentage
+- overall match percentage
 - missing required skills
 - missing preferred skills
 
@@ -156,7 +240,7 @@ Multipart form fields:
 ```text
 resume: PDF/DOC/DOCX file
 jobDescription: full job description text
-analysisContext: JSON string from the current analysis result
+analysisContext: JSON string from the current /api/analyze result
 ```
 
 Returns targeted bullet point suggestions and the work experience section where each bullet should be added.
@@ -172,10 +256,44 @@ Multipart form fields:
 ```text
 resume: PDF/DOC/DOCX file
 jobDescription: full job description text
-analysisContext: JSON string from the current analysis result
+analysisContext: JSON string from the current /api/analyze result
 ```
 
-Returns low-value work experience bullets that are unlikely to reduce ATS score if removed.
+Returns low-value work experience bullets that are unlikely to reduce the ATS score for the current JD.
+
+## Frontend Architecture
+
+`AnalyzerPage.tsx` owns workflow state and API calls. UI sections live in focused components under `client/src/components/analyzer`.
+
+Important state in `AnalyzerPage.tsx`:
+
+| State | Purpose |
+| --- | --- |
+| `resumeFile` | Uploaded resume file |
+| `jobDescription` | JD textarea content |
+| `result` | Main `/api/analyze` response |
+| `isLoading` | Primary analysis loading state |
+| `advancedAction` | Tracks generate or cleanup action loading |
+| `showAdvanced` | Shows/hides advanced overview |
+| `isInputPanelCollapsed` | Focus-results mode toggle |
+| `activeInsightTab` | Skills, generated, or cleanup tab |
+| `generatedBullets` | Generated bullet endpoint response |
+| `unwantedBullets` | Unwanted bullet endpoint response |
+
+Key components:
+
+| Component | Purpose |
+| --- | --- |
+| `AnalyzerHeader` | Product header and top stat pills |
+| `WorkspaceToolbar` | Hide/show input workspace after analysis |
+| `AnalyzerInputForm` | Resume, JD, errors, and analyze button wrapper |
+| `ResumeUploadCard` | Resume file picker |
+| `JobDescriptionCard` | JD textarea with word count |
+| `ScoreSummaryCard` | Overall, required, and preferred score display |
+| `RoleSummaryCard` | Detected role and advanced overview toggle |
+| `AdvancedInsightsPanel` | Skills/generated/cleanup tab workspace |
+| `GeneratedBulletsPanel` | Generated missing-skill bullets |
+| `UnwantedBulletsPanel` | Low-risk cleanup bullet suggestions |
 
 ## Match Scoring
 
@@ -189,19 +307,64 @@ overallMatch = requiredMatch * 0.7 + preferredMatch * 0.3
 
 Required skills contribute 70% of the overall score. Preferred skills contribute 30%.
 
-## Resume Parsing Notes
+## Security And Cost Notes
 
-Both PDF and DOCX files are normalized through the same `resumeStructurer` pipeline after text extraction.
+Current local MVP risks:
 
-Current parser behavior:
+- No authentication.
+- No authorization.
+- CORS is currently open through `cors()`.
+- No rate limiting.
+- No request quota protection around OpenAI calls.
+- API URL is hardcoded in the frontend.
+- Uploaded files are processed in memory and are not stored.
 
-- Keeps summary separate.
-- Keeps key highlights separate from work experience.
-- Extracts skill keywords from skills and highlights.
-- Groups work experience by client/company.
-- Preserves role heading and tech stack per experience.
-- Handles PDF wrapped lines.
-- Handles DOCX paragraph-style bullets.
+Recommended before public deployment:
+
+- Add rate limiting for `/api/analyze` and advanced endpoints.
+- Restrict CORS to the deployed frontend origin.
+- Add request body limits for `jobDescription`.
+- Add basic API authentication or user accounts.
+- Remove or reduce verbose OpenAI debug logging.
+- Avoid logging raw resume or JD content in production.
+
+## Performance Notes
+
+Current bottlenecks:
+
+- Primary analysis can make multiple sequential OpenAI calls.
+- Advanced endpoints re-parse the resume file.
+- No caching exists for repeated resume/JD combinations.
+
+Practical improvements:
+
+- Run required/preferred skill normalization in parallel with `Promise.all`.
+- Cache parsed resume structure by file hash for a short period.
+- Add a parse-only endpoint for debugging uploads without spending OpenAI tokens.
+- Add progress indicators for long-running AI requests.
+
+## Roadmap
+
+Priority 1: reliability and cost control
+
+1. Add backend unit tests for parser, structurer, matcher, and optimizer.
+2. Add rate limiting and request size limits.
+3. Add a parse-only/debug endpoint.
+4. Make frontend API URL configurable through environment variables.
+
+Priority 2: user workflow
+
+1. Add copy buttons for generated bullets.
+2. Add export controls for suggestions.
+3. Add a reset button.
+4. Add clearer grouped output by company/client.
+
+Priority 3: production readiness
+
+1. Add OCR support for scanned PDFs.
+2. Add deployment configuration.
+3. Add auth/history only if users need saved analyses.
+4. Add monitoring and privacy-safe logging.
 
 ## Verification
 
@@ -229,20 +392,13 @@ Backend module load check without real API calls:
 OPENAI_API_KEY=test node -e 'require("./server/routes/analyzeRoutes"); console.log("server modules loaded")'
 ```
 
-## Documentation
+## Full Documentation
 
-Detailed project documentation is available here:
+Detailed handoff documentation is available here:
 
 [docs/PROJECT_DOCUMENTATION.md](docs/PROJECT_DOCUMENTATION.md)
 
-## Known Limitations
-
-- Scanned/image-only PDFs require OCR and are not currently supported.
-- DOC files are rejected by the parser; upload DOCX instead.
-- Generated resume bullets should be reviewed before being used.
-- Scoring is intentionally simple and does not yet weight individual skills by importance.
-
-## GitHub Notes
+## GitHub Safety Notes
 
 This repository should not include:
 
@@ -251,3 +407,4 @@ This repository should not include:
 - `.env`
 - local Codex metadata
 - credentials or secrets
+- uploaded resumes
